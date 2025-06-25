@@ -1,0 +1,132 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+enum ActivityType {
+  ACCOMMODATION
+  RESTAURANT
+  ATTRACTION
+}
+
+enum SearchStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+
+model Activity {
+  id     String @id @default(cuid())
+  query String
+  type  ActivityType
+  location String
+  startDate   DateTime?    
+  endDate     DateTime?  
+  dateFlexible Boolean     @default(false) 
+  noOfAdults  Int
+  noOfChildren Int         @default(0)
+  
+
+  searches    Search[]
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  @@map("activities")
+}
+
+model Search{
+  id String @id @default(cuid())
+  activityId    String
+  activity      Activity     @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  // Browser/crawling info
+  sourceUrl     String       // Current browser URL
+  websiteName   String?      // e.g., "Booking.com", "Airbnb", etc.
+  
+  // Search parameters used
+  searchLocation String?     // Specific location searched
+  searchStartDate DateTime?
+  searchEndDate   DateTime?
+  searchAdults    Int?
+  searchChildren  Int?
+
+  propertyName    String?
+  propertyType    String?     // Hotel, Apartment, House, etc.
+  price           Decimal?    // Price per night or total
+  totalPrice      Decimal?
+  numberOfNights  Int?
+  currency        String?     @default("USD")
+  rating          Decimal?    // Rating out of 5 or 10
+  reviewCount     Int?
+
+  mapLocation     String? 
+  address         String?
+
+  fees            Decimal?    // Additional fees
+  taxes           Decimal?    // Tax amount
+  status          SearchStatus @default(PENDING)
+  errorMessage    String?     // If search failed
+  searchDuration  Int?        // Time taken in seconds
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  @@map("searches")
+  
+}
+
+model WorkflowTemplate {
+  id            String    @id @default(cuid())
+  name          String    // e.g., "Booking.com Hotel Search"
+  websiteUrl    String    // Base URL of the website
+  activityType  ActivityType
+  
+  // JSON field to store the workflow steps
+  steps         Json      // Will contain puppeteer steps as JSON
+  
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@map("workflow_templates")
+}
+
+// Individual workflow execution logs
+model WorkflowExecution {
+  id            String       @id @default(cuid())
+  searchId      String?      // Optional reference to search
+  templateId    String?      // Reference to workflow template
+  
+  status        SearchStatus @default(PENDING)
+  startedAt     DateTime     @default(now())
+  completedAt   DateTime?
+  errorMessage  String?
+  
+  // Execution details
+  stepsCompleted Int         @default(0)
+  totalSteps     Int?
+  currentStep    String?     // Current step being executed
+  
+  // Browser session info
+  browserSessionId String?
+  screenshots      String[]  // Array of screenshot URLs
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  @@map("workflow_executions")
+}
