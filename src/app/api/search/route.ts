@@ -1,7 +1,7 @@
 // app/api/search/route.ts
-import { NextRequest, NextResponse } from 'next/server';
 import { ExecutionPlan } from '@/lib/workflow/ExecutePlan';
 import { ActivityType } from '@prisma/client';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
     try {
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
             message: 'Search started successfully'
         });
 
-    } catch (error:any) {
+    } catch (error: any) {
         console.error('Search API error:', error);
         return NextResponse.json(
             { success: false, error: error.message },
@@ -55,11 +55,11 @@ export async function GET(request: NextRequest) {
             { status: 400 }
         );
 
-    } catch (error:any) {
+    } catch (error: any) {
         console.error('Get status API error:', error);
         return NextResponse.json(
             { success: false, error: error.message },
             { status: 500 }
         );
     }
-  }
+}

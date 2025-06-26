@@ -1,13 +1,14 @@
 // lib/workflow/ExecuteWorkflow.ts
 import prisma from '@/lib/db'; // Your global prisma instance
 import { TaskType } from '@/types/tasks';
-import { WorkflowExecutionStatus, SearchStatus } from '@prisma/client';
-import { LaunchBrowserExecutor } from './executors/launchBrowserExecutor';
-import { FillInputExecutor } from './executors/fillInputExecutor';
+import { SearchStatus, WorkflowExecutionStatus } from '@prisma/client';
 import { ClickElementExecutor } from './executors/clickElementExecutor';
-import { LaunchBrowserInput } from './tasks/launchBrowserTask';
-import { FillInputInput } from './tasks/fillInputTask';
+import { FillInputExecutor } from './executors/fillInputExecutor';
+import { LaunchBrowserExecutor } from './executors/launchBrowserExecutor';
+import { SetGuestsExecutor } from './executors/setGuestExecutor';
 import { ClickElementInput } from './tasks/clickElementTask';
+import { FillInputInput } from './tasks/fillInputTask';
+import { LaunchBrowserInput } from './tasks/launchBrowserTask';
 
 
 export interface WorkflowStepBase<T extends TaskType, P> {
@@ -20,8 +21,9 @@ export interface WorkflowStepBase<T extends TaskType, P> {
 export type LaunchBrowserStep = WorkflowStepBase<TaskType.LAUNCH_BROWSER, LaunchBrowserInput>;
 export type FillInputStep = WorkflowStepBase<TaskType.FILL_INPUT, Omit<FillInputInput, 'page'>>;
 export type ClickElementStep = WorkflowStepBase<TaskType.CLICK_ELEMENT, Omit<ClickElementInput, 'page'>>;
+export type SetGuestsStep = WorkflowStepBase<TaskType.SET_GUESTS, { adults: number; children: number }>;
 
-export type WorkflowStep = LaunchBrowserStep | FillInputStep | ClickElementStep;
+export type WorkflowStep = LaunchBrowserStep | FillInputStep | ClickElementStep | SetGuestsStep;
 
 export interface BookingSearchParams {
     location: string;
@@ -73,7 +75,7 @@ export class WorkflowExecutor {
                     type: TaskType.CLICK_ELEMENT,
                     name: 'Open Date Picker',
                     params: {
-                        selector: 'button[data-testid="date-display-field-start"]'
+                        selector: 'button[data-testid="searchbox-dates-container"]',
                     }
                 },
                 {
@@ -81,7 +83,7 @@ export class WorkflowExecutor {
                     type: TaskType.CLICK_ELEMENT,
                     name: 'Select Check-in Date',
                     params: {
-                        selector: this.getDateSelector(params.startDate)
+                        date: params.startDate
                     }
                 },
                 {
@@ -89,7 +91,7 @@ export class WorkflowExecutor {
                     type: TaskType.CLICK_ELEMENT,
                     name: 'Select Check-out Date',
                     params: {
-                        selector: this.getDateSelector(params.endDate)
+                        date: params.endDate
                     }
                 },
                 {
@@ -98,7 +100,7 @@ export class WorkflowExecutor {
                     name: 'Open Guest Selector',
                     params: {
                         selector: 'button[data-testid="occupancy-config"]'
-                    } 
+                    }
                 },
                 // Add steps for setting adults/children counts
                 ...this.generateGuestSteps(params.adults, params.children),
@@ -131,7 +133,7 @@ export class WorkflowExecutor {
             await this.updateExecutionStatus(WorkflowExecutionStatus.COMPLETED);
             console.log('✅ Workflow completed successfully');
 
-        } catch (error:any) {
+        } catch (error: any) {
             console.error('❌ Workflow execution failed:', error);
             await this.updateExecutionStatus(WorkflowExecutionStatus.FAILED, error.message);
             throw error;
@@ -171,6 +173,15 @@ export class WorkflowExecutor {
                     page: this.context.get('page')
                 });
                 break;
+            case TaskType.SET_GUESTS:
+                if (!this.context.has('page')) {
+                    throw new Error('Page not found in context for SetGuests step');
+                }
+                await SetGuestsExecutor.execute({
+                    ...step.params,
+                    page: this.context.get('page')
+                });
+                break;
 
             default:
                 throw new Error(`Unsupported task type: ${(step as any).type}`);
@@ -178,51 +189,58 @@ export class WorkflowExecutor {
     }
 
     private generateGuestSteps(adults: number, children: number): WorkflowStep[] {
-        const steps: WorkflowStep[] = [];
+        // const steps: WorkflowStep[] = [];
 
-        // Adults - click + button (adults - 1) times since default is 1
-        for (let i = 1; i < adults; i++) {
-            steps.push({
-                id: `add-adult-${i}`,
+        return [
+            {
+                id: 'set-guests',
+                type: TaskType.SET_GUESTS,
+                name: 'Set Guests',
+                params: { adults, children }
+            },
+            {
+                id: 'close-guests-popup',
                 type: TaskType.CLICK_ELEMENT,
-                name: `Add Adult ${i + 1}`,
+                name: 'Close Guest Selector',
                 params: {
-                    selector: 'button[data-testid="occupancy-popup-adults-increment"]'
+                    selector: 'button[data-testid="occupancy-popup-close"]'
                 }
-            });
-        }
-
-        // Children - click + button children times
-        for (let i = 0; i < children; i++) {
-            steps.push({
-                id: `add-child-${i}`,
-                type: TaskType.CLICK_ELEMENT,
-                name: `Add Child ${i + 1}`,
-                params: {
-                    selector: 'button[data-testid="occupancy-popup-children-increment"]'
-                }
-            });
-        }
-
-        // Close the popup
-        steps.push({
-            id: 'close-guests-popup',
-            type: TaskType.CLICK_ELEMENT,
-            name: 'Close Guest Selector',
-            params: {
-                selector: 'button[data-testid="occupancy-popup-close"]'
             }
-        });
-
-        return steps;
+        ];
     }
 
-    private getDateSelector(date: Date): string {
-        const year = date.getFullYear();
-        const month = date.getMonth() + 1;
-        const day = date.getDate();
-        return `span[data-date="${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"]`;
-    }
+    // private getDateSelector(date: Date): string {
+    //     const year = date.getFullYear();
+    //     const month = date.getMonth() + 1;
+    //     const day = date.getDate();
+    //     return `td[data-date="${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"]`;
+    // }
+    // private async clickDateInCalendar(page: any, date: Date): Promise<void> {
+    //     const year = date.getFullYear();
+    //     const monthName = date.toLocaleString('default', { month: 'long' }); // e.g., "July"
+    //     const day = date.getDate().toString().padStart(2, '0');
+    //     const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    //     const dateStr = `${year}-${month}-${day}`;
+
+    //     await page.evaluate((monthName: string, year: string, dateStr: string) => {
+    //         // Find all month containers
+    //         const monthDivs = Array.from(document.querySelectorAll('div.d7b9e080b'));
+    //         for (const div of monthDivs) {
+    //             const header = div.querySelector('h3');
+    //             if (header && header.textContent?.includes(`${monthName} ${year}`)) {
+    //                 const dateTd = div.querySelector(`td[data-date="${dateStr}"]`);
+    //                 if (dateTd) {
+    //                     // Click the span inside the td
+    //                     const span = dateTd.querySelector('span');
+    //                     if (span) {
+    //                         (span as HTMLElement).click();
+    //                         break;
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }, monthName, year, dateStr);
+    // }
 
     private async extractAndSaveResults(): Promise<void> {
         const page = this.context.get('page');

@@ -76,7 +76,7 @@ export class ExecutionPlan {
                 data: { updatedAt: new Date() }
             });
 
-        } catch (error) {
+        } catch (error:any) {
             console.error('❌ Workflow execution failed:', error);
 
             // Update execution with error
@@ -94,8 +94,15 @@ export class ExecutionPlan {
     static async getExecutionStatus(executionId: string) {
         const execution = await prisma.workflowExecution.findUnique({
             where: { id: executionId },
-            include: {
-                // Add any related data you want to return
+            select: {
+                id: true,
+                status: true,
+                totalSteps: true,
+                stepsCompleted: true,
+                currentStep: true,
+                startedAt: true,
+                completedAt: true,
+                errorMessage: true
             }
         });
 

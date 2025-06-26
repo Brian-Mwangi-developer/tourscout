@@ -43,7 +43,8 @@ export const ClickElementTask: WorkflowTask = {
 
 export interface ClickElementInput {
     page: Page;
-    selector: string;
+    selector?: string;
+    date?: Date;
     waitForNavigation?: boolean;
 }
 

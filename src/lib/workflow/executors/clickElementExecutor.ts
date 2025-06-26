@@ -1,21 +1,44 @@
-// lib/workflow/executors/ClickElementExecutor.ts
 import { Page } from 'puppeteer';
 import { ClickElementInput, ClickElementOutput } from '../tasks/clickElementTask';
 
 export class ClickElementExecutor {
     static async execute(input: ClickElementInput): Promise<ClickElementOutput> {
-        console.log(`🖱️  Clicking element: ${input.selector}`);
+        const page = input.page as Page;
 
-        try {
-            const page = input.page as Page;
+        // Handle date-based click
+        if (input.date) {
+            const year = input.date.getFullYear();
+            const monthName = input.date.toLocaleString('default', { month: 'long' });
+            const day = input.date.getDate().toString().padStart(2, '0');
+            const month = (input.date.getMonth() + 1).toString().padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
 
-            // Wait for the element to be available and visible
+            await page.evaluate((monthName: string, year: number, dateStr: string) => {
+                const monthDivs = Array.from(document.querySelectorAll('div.d7b9e080b'));
+                for (const div of monthDivs) {
+                    const header = div.querySelector('h3');
+                    if (header && header.textContent?.includes(`${monthName} ${year}`)) {
+                        const dateCell = div.querySelector(`td[data-date="${dateStr}"]`);
+                        if (dateCell) {
+                            (dateCell as HTMLElement).click();
+                            break;
+                        }
+                    }
+                }
+            }, monthName, year, dateStr);
+
+            return { page };
+        }
+
+        // Handle selector-based click
+        if (input.selector) {
+            console.log(`🖱️  Clicking element: ${input.selector}`);
+
             await page.waitForSelector(input.selector, {
                 visible: true,
                 timeout: 15000
             });
 
-            // Scroll to element to ensure it's in view
             await page.evaluate((selector) => {
                 const element = document.querySelector(selector);
                 if (element) {
@@ -23,10 +46,6 @@ export class ClickElementExecutor {
                 }
             }, input.selector);
 
-            // Wait a moment after scrolling
-            // await page.waitForTimeout(500);
-
-            // Click the element
             if (input.waitForNavigation) {
                 await Promise.all([
                     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -36,17 +55,9 @@ export class ClickElementExecutor {
                 await page.click(input.selector);
             }
 
-            // Wait a moment after clicking
-            // await page.waitForTimeout(1000);
-
-            console.log('✅ Element clicked successfully');
-
-            return {
-                page
-            };
-        } catch (error) {
-            console.error('❌ Failed to click element:', error);
-            throw new Error(`Failed to click element ${input.selector}: ${error}`);
+            return { page };
         }
+
+        throw new Error('ClickElementExecutor: Either selector or date must be provided.');
     }
 }
