@@ -1,6 +1,6 @@
 // app/api/search/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { ExecutionPlan } from '@/lib/workflow/executePlan';
+import { ExecutionPlan } from '@/lib/workflow/ExecutePlan';
 import { ActivityType } from '@prisma/client';
 
 export async function POST(request: NextRequest) {

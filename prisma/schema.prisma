@@ -27,6 +27,13 @@ enum SearchStatus {
   FAILED
 }
 
+enum WorkflowExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
 
 model Activity {
   id     String @id @default(cuid())
@@ -75,6 +82,7 @@ model Search{
 
   mapLocation     String? 
   address         String?
+  bookingUrl      String?     // URL to book or view property
 
   fees            Decimal?    // Additional fees
   taxes           Decimal?    // Tax amount
@@ -111,7 +119,7 @@ model WorkflowExecution {
   searchId      String?      // Optional reference to search
   templateId    String?      // Reference to workflow template
   
-  status        SearchStatus @default(PENDING)
+  status        WorkflowExecutionStatus @default(PENDING)
   startedAt     DateTime     @default(now())
   completedAt   DateTime?
   errorMessage  String?
