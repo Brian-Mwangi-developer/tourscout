@@ -45,6 +45,8 @@ export interface ClickElementInput {
     page: Page;
     selector?: string;
     date?: Date;
+    optional?: boolean;
+    fallbackAction?: 'clickBody' | 'pressEscape';
     waitForNavigation?: boolean;
 }
 

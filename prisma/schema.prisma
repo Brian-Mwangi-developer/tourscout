@@ -25,6 +25,7 @@ enum SearchStatus {
   IN_PROGRESS
   COMPLETED
   FAILED
+  RUNNING
 }
 
 enum WorkflowExecutionStatus {
@@ -137,4 +138,20 @@ model WorkflowExecution {
   updatedAt     DateTime     @updatedAt
   
   @@map("workflow_executions")
+}
+
+model SearchResults {
+  id String @id @default(cuid())
+  prompt String
+  runId String?
+  results BookingsFound[]
+  status  SearchStatus @default(PENDING)
+}
+
+model BookingsFound{
+  id String @id @default(cuid())
+  booking Json?
+  searchResultsId String
+  searchResults SearchResults @relation(fields: [searchResultsId], references: [id])
+
 }
