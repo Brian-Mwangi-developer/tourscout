@@ -146,6 +146,9 @@ model SearchResults {
   runId String?
   results BookingsFound[]
   status  SearchStatus @default(PENDING)
+  paymentStatus String?  @default("PENDING")// e.g., "PAID", "UNPAID","PENNDING"
+  stripeCustomerId String?
+  stripeConnectId String? @default("acct_1R8xhxK21MZy2VW1")
 }
 
 model BookingsFound{
