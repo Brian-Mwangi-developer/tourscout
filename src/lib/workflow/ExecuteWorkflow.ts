@@ -1,7 +1,7 @@
 // lib/workflow/ExecuteWorkflow.ts
 import prisma from '@/lib/db'; // Your global prisma instance
 import { TaskType } from '@/types/tasks';
-import { SearchStatus, WorkflowExecutionStatus } from '@prisma/client';
+import { WorkflowExecutionStatus } from '@prisma/client';
 import { ClickElementExecutor } from './executors/clickElementExecutor';
 import { FillInputExecutor } from './executors/fillInputExecutor';
 import { LaunchBrowserExecutor } from './executors/launchBrowserExecutor';
@@ -71,29 +71,16 @@ export class WorkflowExecutor {
                     }
                 },
                 {
-                    id: 'click-dates',
+                    id: 'handle-location-dropdown',
                     type: TaskType.CLICK_ELEMENT,
-                    name: 'Open Date Picker',
+                    name: 'Handle Location Suggestions',
                     params: {
-                        selector: 'button[data-testid="searchbox-dates-container"]',
+                        selector: 'li[data-i="0"]', // First suggestion
+                        optional: true, // Don't fail if not found
+                        fallbackAction: 'clickBody' // Click body if suggestion not found
                     }
                 },
-                {
-                    id: 'select-checkin',
-                    type: TaskType.CLICK_ELEMENT,
-                    name: 'Select Check-in Date',
-                    params: {
-                        date: params.startDate
-                    }
-                },
-                {
-                    id: 'select-checkout',
-                    type: TaskType.CLICK_ELEMENT,
-                    name: 'Select Check-out Date',
-                    params: {
-                        date: params.endDate
-                    }
-                },
+
                 {
                     id: 'click-guests',
                     type: TaskType.CLICK_ELEMENT,
@@ -189,8 +176,8 @@ export class WorkflowExecutor {
     }
 
     private generateGuestSteps(adults: number, children: number): WorkflowStep[] {
-        // const steps: WorkflowStep[] = [];
-
+        if (adults < 1) adults = 1; // Ensure at least one adult
+        if (children < 0) children = 0; // Ensure no negative children
         return [
             {
                 id: 'set-guests',
@@ -198,49 +185,18 @@ export class WorkflowExecutor {
                 name: 'Set Guests',
                 params: { adults, children }
             },
-            {
-                id: 'close-guests-popup',
-                type: TaskType.CLICK_ELEMENT,
-                name: 'Close Guest Selector',
-                params: {
-                    selector: 'button[data-testid="occupancy-popup-close"]'
-                }
-            }
+            // {
+            //     id: 'close-guests-popup',
+            //     type: TaskType.CLICK_ELEMENT,
+            //     name: 'Close Guest Selector',
+            //     params: {
+            //         selector: 'button[data-testid="occupancy-popup-close"]'
+            //     }
+            // }
         ];
     }
 
-    // private getDateSelector(date: Date): string {
-    //     const year = date.getFullYear();
-    //     const month = date.getMonth() + 1;
-    //     const day = date.getDate();
-    //     return `td[data-date="${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"]`;
-    // }
-    // private async clickDateInCalendar(page: any, date: Date): Promise<void> {
-    //     const year = date.getFullYear();
-    //     const monthName = date.toLocaleString('default', { month: 'long' }); // e.g., "July"
-    //     const day = date.getDate().toString().padStart(2, '0');
-    //     const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    //     const dateStr = `${year}-${month}-${day}`;
 
-    //     await page.evaluate((monthName: string, year: string, dateStr: string) => {
-    //         // Find all month containers
-    //         const monthDivs = Array.from(document.querySelectorAll('div.d7b9e080b'));
-    //         for (const div of monthDivs) {
-    //             const header = div.querySelector('h3');
-    //             if (header && header.textContent?.includes(`${monthName} ${year}`)) {
-    //                 const dateTd = div.querySelector(`td[data-date="${dateStr}"]`);
-    //                 if (dateTd) {
-    //                     // Click the span inside the td
-    //                     const span = dateTd.querySelector('span');
-    //                     if (span) {
-    //                         (span as HTMLElement).click();
-    //                         break;
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }, monthName, year, dateStr);
-    // }
 
     private async extractAndSaveResults(): Promise<void> {
         const page = this.context.get('page');
@@ -278,20 +234,20 @@ export class WorkflowExecutor {
         });
 
         // Save to database
-        for (const property of properties) {
-            await prisma.search.create({
-                data: {
-                    activityId: this.activityId,
-                    sourceUrl: page.url(),
-                    websiteName: 'Booking.com',
-                    propertyName: property.name,
-                    price: this.extractPrice(property.price),
-                    rating: this.extractRating(property.rating),
-                    bookingUrl: property.url,
-                    status: SearchStatus.COMPLETED
-                }
-            });
-        }
+        // for (const property of properties) {
+        //     await prisma.search.create({
+        //         data: {
+        //             activityId: this.activityId,
+        //             sourceUrl: page.url(),
+        //             websiteName: 'Booking.com',
+        //             propertyName: property.name,
+        //             price: this.extractPrice(property.price),
+        //             rating: this.extractRating(property.rating),
+        //             bookingUrl: property.url,
+        //             status: SearchStatus.COMPLETED
+        //         }
+        //     });
+        // }
 
         console.log(`💾 Saved ${properties.length} properties to database`);
     }
@@ -328,3 +284,70 @@ export class WorkflowExecutor {
         });
     }
 }
+
+
+
+
+
+
+
+//ignore the below code
+
+// {
+//     id: 'click-dates',
+//     type: TaskType.CLICK_ELEMENT,
+//     name: 'Open Date Picker',
+//     params: {
+//         selector: 'button[data-testid="searchbox-dates-container"]',
+//     }
+// },
+// {
+//     id: 'select-checkin',
+//     type: TaskType.CLICK_ELEMENT,
+//     name: 'Select Check-in Date',
+//     params: {
+//         date: params.startDate
+//     }
+// },
+// {
+//     id: 'select-checkout',
+//     type: TaskType.CLICK_ELEMENT,
+//     name: 'Select Check-out Date',
+//     params: {
+//         date: params.endDate
+//     }
+// },
+
+
+// private getDateSelector(date: Date): string {
+//     const year = date.getFullYear();
+//     const month = date.getMonth() + 1;
+//     const day = date.getDate();
+//     return `td[data-date="${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"]`;
+// }
+// private async clickDateInCalendar(page: any, date: Date): Promise<void> {
+//     const year = date.getFullYear();
+//     const monthName = date.toLocaleString('default', { month: 'long' }); // e.g., "July"
+//     const day = date.getDate().toString().padStart(2, '0');
+//     const month = (date.getMonth() + 1).toString().padStart(2, '0');
+//     const dateStr = `${year}-${month}-${day}`;
+
+//     await page.evaluate((monthName: string, year: string, dateStr: string) => {
+//         // Find all month containers
+//         const monthDivs = Array.from(document.querySelectorAll('div.d7b9e080b'));
+//         for (const div of monthDivs) {
+//             const header = div.querySelector('h3');
+//             if (header && header.textContent?.includes(`${monthName} ${year}`)) {
+//                 const dateTd = div.querySelector(`td[data-date="${dateStr}"]`);
+//                 if (dateTd) {
+//                     // Click the span inside the td
+//                     const span = dateTd.querySelector('span');
+//                     if (span) {
+//                         (span as HTMLElement).click();
+//                         break;
+//                     }
+//                 }
+//             }
+//         }
+//     }, monthName, year, dateStr);
+// }
