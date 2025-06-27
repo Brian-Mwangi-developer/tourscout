@@ -11,23 +11,36 @@ export async function POST(request: NextRequest) {
         const searchRequest = await processSearchQuery(body.query);
 
         const pendingSearch = await prisma.searchResults.create({
-            data:{
+            data: {
                 prompt: body.query,
-                status:"PENDING"
+                status: "PENDING"
             }
         })
 
         console.log('🔍 db update, search Pending:');
         //Add webhook Url to the search Request
-        const searchRequestWithWebhook ={
+        const searchRequestWithWebhook = {
             ...searchRequest,
             // This will be sent to your webhook when complete
-            webhookUrl: `${process.env.BASE_URL}/api/apify-webhook`,
+            webhookUrl: `${process.env.BASE_URL!}/api/apify-webhook`,
             searchId: pendingSearch.id
         }
         console.log('🎬 Starting actor run...');
         const run = await apifyClient.actor(process.env.ACTOR_ID!).start(searchRequestWithWebhook);
         console.log('🚀 Actor run started:', run.id);
+        await apifyClient.webhooks().create({
+            eventTypes: ['ACTOR.RUN.SUCCEEDED'],
+            requestUrl: `${process.env.BASE_URL!}/api/apify-webhook`,
+            payloadTemplate: JSON.stringify({
+                searchId: pendingSearch.id,
+                runId: run.id,
+                status: 'SUCCEEDED',
+                defaultDatasetId: run.defaultDatasetId,
+            }),
+            condition: {
+                actorRunId: run.id
+            }
+        });
 
         await prisma.searchResults.update({
             where: { id: pendingSearch.id },
@@ -36,6 +49,7 @@ export async function POST(request: NextRequest) {
                 status: 'RUNNING'
             }
         });
+        console.log('✅ Search job started successfully:', pendingSearch.id);
         return NextResponse.json({
             success: true,
             message: 'Search job started successfully',
