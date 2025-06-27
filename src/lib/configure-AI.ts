@@ -14,8 +14,57 @@ const searchRequestSchema = z.object({
     rooms: z.number().optional().describe("Number of rooms needed"),
     adults: z.number().optional().describe("Number of adults"),
     children: z.number().optional().describe("Number of children"),
-    minMaxPrice: z.string().default("0-999999").describe("Price range in format min-max")
+    minMaxPrice: z.string().default("0-999999").describe("Price range in format min-max"),
+    checkIn: z.string().optional().describe("Check-in date in YYYY-MM-DD format"),
+    checkOut: z.string().optional().describe("Check-out date in YYYY-MM-DD format")
 });
+
+
+
+/**
+ * Parses natural language date expressions into YYYY-MM-DD format
+ * @param expression The date expression (today, tomorrow, weekend, etc.)
+ * @param referenceDate Base date for calculations
+ * @returns Formatted date string or undefined if unparseable
+ */
+function parseDateExpression(expression: string, referenceDate: Date = new Date()): string | undefined {
+    const lowerExp = expression.toLowerCase().trim();
+    let resultDate = new Date(referenceDate);
+
+    // Simple relative date handling
+    if (lowerExp.includes('today')) {
+        // Use reference date
+    } else if (lowerExp.includes('tomorrow')) {
+        resultDate.setDate(resultDate.getDate() + 1);
+    } else if (lowerExp.includes('weekend') || lowerExp.includes('saturday')) {
+        // Find next Saturday
+        const dayOfWeek = resultDate.getDay(); // 0=Sunday, 6=Saturday
+        const daysToAdd = dayOfWeek === 6 ? 7 : (6 - dayOfWeek);
+        resultDate.setDate(resultDate.getDate() + daysToAdd);
+    } else if (lowerExp.includes('next week')) {
+        resultDate.setDate(resultDate.getDate() + 7);
+    } else if (lowerExp.match(/in (\d+) days?/)) {
+        const matches = lowerExp.match(/in (\d+) days?/);
+        if (matches && matches[1]) {
+            resultDate.setDate(resultDate.getDate() + parseInt(matches[1], 10));
+        }
+    } else {
+        // Try to parse specific date formats
+        try {
+            const possibleDate = new Date(expression);
+            if (!isNaN(possibleDate.getTime())) {
+                resultDate = possibleDate;
+            } else {
+                return undefined;
+            }
+        } catch {
+            return undefined;
+        }
+    }
+
+    // Format as YYYY-MM-DD
+    return resultDate.toISOString().split('T')[0];
+}
 
 type SearchRequest = z.infer<typeof searchRequestSchema>;
 
@@ -32,20 +81,27 @@ Extract the search parameters and provide a JSON object with the following field
 - adults: Number of adults (only include if mentioned in query)
 - children: Number of children (only include if mentioned in query)
 - budget: Budget amount in dollars (only include if mentioned in query)
+- checkInExpression: Extract check-in date or expression (e.g., "today", "tomorrow", "next weekend", "July 1st")
+- checkOutExpression: Extract check-out date or expression (e.g., "tomorrow", "next week", "July 5th")
 
 Important rules:
 - Only include fields that are explicitly mentioned in the user's query
 - Do not include default values in the response
 - If no location is specified, use "Miami beach" as the search location
 - For budget, extract only the numeric value (e.g., if user says "30 dollars" or "$30", extract 30)
+- For dates, extract the natural language expression exactly as mentioned (today, tomorrow, this weekend, etc.)
+- If a specific date is mentioned (e.g., "June 30th"), include it exactly as stated
 - Respond ONLY with a valid JSON object, no markdown formatting, no code blocks, no additional text
 
 Example:
-Query: "I need accommodation in Paris for 3 adults"
-Response: {{"search": "Paris", "adults": 3}}
+Query: "I need accommodation in Paris for 3 adults from tomorrow until next week"
+Response: {{"search": "Paris", "adults": 3, "checkInExpression": "tomorrow", "checkOutExpression": "next week"}}
 
-Query: "Find me a 4-star hotel in London for 2 rooms with a budget of 50 dollars"
-Response: {{"search": "London", "starsCountFilter": "4", "rooms": 2, "budget": 50}}`);
+Query: "Find me a 4-star hotel in London for 2 rooms with a budget of 50 dollars arriving on weekend"
+Response: {{"search": "London", "starsCountFilter": "4", "rooms": 2, "budget": 50, "checkInExpression": "weekend"}}
+
+Query: "Book a place in Tokyo for 2 adults and 1 child from July 1st to July 5th"
+Response: {{"search": "Tokyo", "adults": 2, "children": 1, "checkInExpression": "July 1st", "checkOutExpression": "July 5th"}}`);
 
 /**
  * Processes a natural language query into a structured search request
@@ -116,7 +172,17 @@ export async function processSearchQuery(query: string): Promise<SearchRequest> 
         if (extractedParams.budget) {
             searchRequest.minMaxPrice = `0-${extractedParams.budget}`;
         }
-
+        if (extractedParams.checkOutExpression) {
+            const checkOutDate = parseDateExpression(extractedParams.checkOutExpression);
+            if (checkOutDate) {
+                searchRequest.checkOut = checkOutDate;
+            }
+        } else if (searchRequest.checkIn) {
+            // If only check-in is provided, set check-out to next day by default
+            const checkInDate = new Date(searchRequest.checkIn);
+            checkInDate.setDate(checkInDate.getDate() + 1);
+            searchRequest.checkOut = checkInDate.toISOString().split('T')[0];
+        }
         // Validate the final result
         const validatedResult = searchRequestSchema.parse(searchRequest);
 

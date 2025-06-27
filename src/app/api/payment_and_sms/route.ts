@@ -59,9 +59,16 @@ export async function POST(request: NextRequest) {
                 success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
                 cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/cancel`,
                 metadata: {
-                    searchId: globalSearchId,
+                    searchId: searchId,
                     phoneNumber: phoneNumber,
                 },
+            });
+            await prisma.searchResults.update({
+                where: { id: searchId },
+                data: {
+                    stripeSessionId: session.id,
+                    phoneNumber: phoneNumber,
+                }
             });
 
             const bookingsWithImages = await getBookingsWithImages(searchId!);
@@ -71,6 +78,7 @@ export async function POST(request: NextRequest) {
                 to: phoneNumber,
                 message: smsMessage,
             });
+            console.log("Stripe Session Url", session.success_url);
             if (smsResult.Recipients) {
                 return NextResponse.json({
                     success: true,

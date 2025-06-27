@@ -40,7 +40,7 @@ export async function createSMSMessage(checkoutUrl: string, bookings: BookingDat
             // Add first 2 image links
             if (booking.images && booking.images.length > 0) {
                 const imageLinks = booking.images.slice(0, 3);
-                message += ` Images ${index+1}: ${imageLinks.join(', ')}\n`;
+                message += ` Images ${index + 1}: ${imageLinks.join(', ')}\n`;
             }
 
             message += "\n";
@@ -55,9 +55,10 @@ export function createBookingDetailsMessage(bookings: BookingData[]): string {
     let message = "✅ Payment Successful! Here are your booking options:\n\n";
 
     bookings.forEach((booking, index) => {
-        message += `🏨 ${index + 1}. ${booking.name}\n`;
-        message += `📍 ${booking.address.full}\n`;
-        message += `⭐ Rating: ${booking.rating}/10\n`;
+        message += ` ${index + 1}. ${booking.name}\n`;
+        message += ` Booking Url: $${booking.url}\n`;
+        message += `address ${booking.address.full}\n`;
+        message += `Rating: ${booking.rating}\n`;
 
         if (booking.images && booking.images.length > 0) {
             message += `🖼️ Images: ${booking.images.join(', ')}\n`;
